@@ -53,12 +53,12 @@ app.post('/api/seals/generate-batch-seal', upload.fields([
         // 1. Exécution du générateur industriel complet
         const batchResult = processIndustrialBatch(lot, parseInt(quantite, 10));
 
-        // 2. Génération du sceau SVG unitaire
-        const sampleSvg = generateUnitSealSvg(lot, 1, "I", batchResult.cornerPattern);
+        // 2. Génération du sceau PNG unitaire Haute Définition (avec await)
+        const samplePngBuffer = await generateUnitSealSvg(lot, 1, "I", batchResult.cornerPattern);
         
-        // CORRECTION : On simule un encodage accepté par le validateur front-end (SVG encapsulé en data image valide)
-        const svgBase64 = Buffer.from(sampleSvg).toString('base64');
-        const imageUrl = `data:image/svg+xml;base64,${svgBase64}`;
+        // Conversion du buffer PNG en base64 pour le front-end
+        const pngBase64 = samplePngBuffer.toString('base64');
+        const imageUrl = `data:image/png;base64,${pngBase64}`;
 
         // 3. Calcul de l'empreinte Hash SHA-256 unique
         const rawStringData = `${nom_produit || 'Produit'}-${lot}-${quantite}-${pays_origine || 'Cameroun'}-${Date.now()}`;
