@@ -5,7 +5,7 @@ const config = require('../config/sealConfig');
 const { toCompactRomanSeries } = require('./variableStream');
 
 /**
- * Dessine un glyphe géométrique spécifique (carré, cercle, losange, croix, barre)
+ * Dessine proprement un glyphe géométrique dans la trame
  */
 function drawGlyph(ctx, type, x, y, size) {
     ctx.save();
@@ -39,10 +39,10 @@ function drawGlyph(ctx, type, x, y, size) {
             break;
         case 'CROSS':
             ctx.beginPath();
-            ctx.moveTo(x + half, y + 2);
-            ctx.lineTo(x + half, y + size - 2);
-            ctx.moveTo(x + 2, y + half);
-            ctx.lineTo(x + size - 2, y + half);
+            ctx.moveTo(x + half, y + 4);
+            ctx.lineTo(x + half, y + size - 4);
+            ctx.moveTo(x + 4, y + half);
+            ctx.lineTo(x + size - 4, y + half);
             ctx.stroke();
             break;
         case 'BAR':
@@ -54,88 +54,80 @@ function drawGlyph(ctx, type, x, y, size) {
 }
 
 /**
- * Génère le Sceau unitaire carré avec trame de glyphes intérieurs et zone de lot en bas
+ * Génère le Sceau unitaire carré avec une bordure de glyphes alignée et une zone basse propre
  */
 async function generateUnitSealPng(lotNumber, arabicIndex, compactSeries, cornerPattern) {
     const size = 800;
     const canvas = createCanvas(size, size);
     const ctx = canvas.getContext('2d');
 
-    // 1. Fond général du sceau
+    // 1. Fond général
     ctx.fillStyle = '#FAF8F5';
     ctx.fillRect(0, 0, size, size);
 
-    const margin = 60;
+    const margin = 50;
     const boxX = margin;
     const boxY = margin;
     const boxSize = size - (2 * margin);
 
-    // 2. Cadre carré extérieur principal
+    // 2. Cadre extérieur principal
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(boxX, boxY, boxSize, boxSize);
     ctx.strokeStyle = '#0F766E';
-    ctx.lineWidth = 6;
+    ctx.lineWidth = 5;
     ctx.strokeRect(boxX, boxY, boxSize, boxSize);
 
-    // 3. Trame de glyphes intérieurs (répartition style motif technique)
+    // 3. Trame de glyphes rigoureusement alignée en bordure (cadre de sécurité)
     const glyphTypes = ['CIRCLE', 'SQUARE', 'DIAMOND', 'CROSS', 'BAR', 'EMPTY_CIRCLE'];
-    const gridSize = 40;
-    const startX = boxX + 30;
-    const startY = boxY + 30;
-    const endX = boxX + boxSize - 50;
-    const endY = boxY + boxSize - 220; // Laisse de l'espace en bas pour le bloc Lot
+    const step = 45;
+    
+    // Fonction pseudo-aléatoire fixe basée sur les index pour garder la cohérence du lot
+    let seed = arabicIndex * 33;
+    const getSymbol = (i) => glyphTypes[(seed + i) % glyphTypes.length];
 
-    // Remplissage subtil en arrière-plan de glyphes
-    let seed = 123;
-    function pseudoRandom() {
-        seed = (seed * 9301 + 49297) % 233280;
-        return seed / 233280;
+    let indexCount = 0;
+    // Bordure Haute et Basse (dans la zone haute)
+    for (let x = boxX + 30; x < boxX + boxSize - 30; x += step) {
+        drawGlyph(ctx, getSymbol(indexCount++), x, boxY + 20, 26);
+        drawGlyph(ctx, getSymbol(indexCount++), x, boxY + boxSize - 220, 26);
+    }
+    // Bordures Latérales
+    for (let y = boxY + 80; y < boxY + boxSize - 240; y += step) {
+        drawGlyph(ctx, getSymbol(indexCount++), boxX + 20, y, 26);
+        drawGlyph(ctx, getSymbol(indexCount++), boxX + boxSize - 46, y, 26);
     }
 
-    for (let gx = startX; gx < endX; gx += gridSize) {
-        for (let gy = startY; gy < endY; gy += gridSize) {
-            // On ne met pas de glyphes en plein milieu pour préserver la lisibilité du logo et du texte
-            const distToCenterCenter = Math.hypot(gx - (size/2), gy - (boxY + 160));
-            if (distToCenterCenter > 130) {
-                if (pseudoRandom() > 0.4) {
-                    const randomGlyph = glyphTypes[Math.floor(pseudoRandom() * glyphTypes.length)];
-                    drawGlyph(ctx, randomGlyph, gx, gy, 24);
-                }
-            }
-        }
-    }
-
-    // 4. Insertion du logo ANOR central
+    // 4. Logo ANOR central bien positionné
     const logoPath = path.join(__dirname, '../assets/logo_anor_master.png');
     if (fs.existsSync(logoPath)) {
         try {
             const logoImage = await loadImage(logoPath);
-            const logoSize = 110;
-            ctx.drawImage(logoImage, (size - logoSize) / 2, boxY + 50, logoSize, logoSize);
+            const logoSize = 120;
+            ctx.drawImage(logoImage, (size - logoSize) / 2, boxY + 70, logoSize, logoSize);
         } catch (e) {
             console.error("Erreur chargement logo :", e);
         }
     }
 
-    // 5. Zone inférieure dédiée au Lot et à la Série (Conforme à ton attente)
-    // Séparateur fin
+    // 5. Ligne de séparation nette et propre
+    const sepY = boxY + 540;
     ctx.strokeStyle = '#0F766E';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.moveTo(boxX + 50, boxY + 410);
-    ctx.lineTo(boxX + boxSize - 50, boxY + 410);
+    ctx.moveTo(boxX + 40, sepY);
+    ctx.lineTo(boxX + boxSize - 40, sepY);
     ctx.stroke();
 
-    // Texte LOT
+    // 6. Zone inférieure structurée pour le Lot et les métadonnées (sans aucun chevauchement)
     ctx.textAlign = 'center';
-    ctx.font = 'bold 36px Arial, sans-serif';
+    
+    ctx.font = 'bold 38px Arial, sans-serif';
     ctx.fillStyle = '#0F766E';
-    ctx.fillText(`LOT ${lotNumber}`, size / 2, boxY + 470);
+    ctx.fillText(`LOT : ${lotNumber}`, size / 2, sepY + 65);
 
-    // Texte Série / Code Datamatrix simulé en bas
-    ctx.font = 'bold 26px Arial, sans-serif';
+    ctx.font = 'bold 24px Arial, sans-serif';
     ctx.fillStyle = '#1E293B';
-    ctx.fillText(`SERIE : ${compactSeries} / DM : #${arabicIndex}`, size / 2, boxY + 520);
+    ctx.fillText(`SÉRIE : ${compactSeries}   |   INDEX : #${arabicIndex}`, size / 2, sepY + 120);
 
     return canvas.toBuffer('image/png');
 }
@@ -144,7 +136,7 @@ async function generateUnitSealPng(lotNumber, arabicIndex, compactSeries, corner
  * Fonction principale de traitement du lot industriel
  */
 async function processIndustrialBatch(lotNumber, totalQuantity) {
-    console.log(`[GÉNÉRATION LOT CARRÉ] Traitement du lot ${lotNumber} (${totalQuantity} pièces)...`);
+    console.log(`[GÉNÉRATION LOT CARRÉ PRO] Traitement du lot ${lotNumber} (${totalQuantity} pièces)...`);
     
     const lotCornerPattern = ['SQUARE', 'CIRCLE', 'DIAMOND', 'CROSS'];
     const batchDir = path.join(__dirname, `../output/batches/${lotNumber}`);
