@@ -1,13 +1,11 @@
 /**
- * ANOR_SEAL - Générateur Complet de Lot Industriel (Backend - PNG Souverain & Repères Ancrés)
+ * ANOR_SEAL - Générateur Complet de Lot Industriel (Backend - SVG Natif / Sans dépendance native)
  * Associe les 4 coins géométriques, les glyphes, le lot et les séries compactes,
- * puis génère les visuels en PNG pur pour l'industriel.
+ * puis génère les visuels robustes pour l'industriel.
  */
 
 const fs = require('fs');
 const path = require('path');
-const { createCanvas, loadImage } = require('canvas');
-const QRCode = require('qrcode');
 const config = require('../config/sealConfig');
 const { toCompactRomanSeries } = require('./variableStream');
 
@@ -25,144 +23,78 @@ function generateRandomCornerPattern() {
 }
 
 /**
- * Dessine une forme de repère géométrique ancrée exactement aux coordonnées cibles
+ * Génère le balisage SVG pour une forme de repère ancrée
  */
-function drawCornerShape(ctx, shape, x, y, size) {
-    ctx.save();
-    ctx.strokeStyle = '#1E293B';
-    ctx.fillStyle = '#FFFFFF';
-    ctx.lineWidth = 5;
-
+function getCornerSvgShape(shape, x, y, size) {
+    const half = size / 2;
     switch (shape) {
         case 'EMPTY_CIRCLE':
-            ctx.beginPath();
-            ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.stroke();
-            break;
+            return `<circle cx="${x + half}" cy="${y + half}" r="${half}" fill="#FFFFFF" stroke="#1E293B" stroke-width="5" />`;
         case 'EMPTY_DIAMOND':
-            ctx.beginPath();
-            ctx.moveTo(x + size / 2, y);
-            ctx.lineTo(x + size, y + size / 2);
-            ctx.lineTo(x + size / 2, y + size);
-            ctx.lineTo(x, y + size / 2);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-            break;
+            return `<polygon points="${x + half},${y} ${x + size},${y + half} ${x + half},${y + size} ${x},${y + half}" fill="#FFFFFF" stroke="#1E293B" stroke-width="5" />`;
         case 'EMPTY_H_RECTANGLE':
-            ctx.fillRect(x, y + size * 0.25, size, size * 0.5);
-            ctx.strokeRect(x, y + size * 0.25, size, size * 0.5);
-            break;
+            return `<rect x="${x}" y="${y + size * 0.25}" width="${size}" height="${size * 0.5}" fill="#FFFFFF" stroke="#1E293B" stroke-width="5" />`;
         case 'EMPTY_V_RECTANGLE':
-            ctx.fillRect(x + size * 0.25, y, size * 0.5, size);
-            ctx.strokeRect(x + size * 0.25, y, size * 0.5, size);
-            break;
+            return `<rect x="${x + size * 0.25}" y="${y}" width="${size * 0.5}" height="${size}" fill="#FFFFFF" stroke="#1E293B" stroke-width="5" />`;
         case 'EMPTY_TRIANGLE':
-            ctx.beginPath();
-            ctx.moveTo(x + size / 2, y);
-            ctx.lineTo(x + size, y + size);
-            ctx.lineTo(x, y + size);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-            break;
+            return `<polygon points="${x + half},${y} ${x + size},${y + size} ${x},${y + size}" fill="#FFFFFF" stroke="#1E293B" stroke-width="5" />`;
         case 'EMPTY_SQUARE':
         default:
-            ctx.fillRect(x, y, size, size);
-            ctx.strokeRect(x, y, size, size);
-            break;
+            return `<rect x="${x}" y="${y}" width="${size}" height="${size}" fill="#FFFFFF" stroke="#1E293B" stroke-width="5" />`;
     }
-    ctx.restore();
 }
 
 /**
- * Génère le PNG d'un sceau unitaire avec les repères ancrés dans le carré
+ * Génère le Sceau unitaire en SVG haute définition avec repères strictement ancrés dans le carré
  */
-async function generateUnitSealPng(lotNumber, arabicIndex, compactSeries, cornerPattern, productImgPath) {
-    const size = 800; // Haute définition industrielle
-    const canvas = createCanvas(size, size);
-    const ctx = canvas.getContext('2d');
-
-    // 1. Fond général du sceau
-    ctx.fillStyle = '#FAF8F5';
-    ctx.fillRect(0, 0, size, size);
-
-    // 2. Cadre principal de certification (Le Carré)
+function generateUnitSealSvg(lotNumber, arabicIndex, compactSeries, cornerPattern) {
+    const size = 800;
     const margin = 100;
     const boxX = margin;
     const boxY = margin;
     const boxSize = size - (2 * margin);
+    const fSize = 50;
 
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(boxX, boxY, boxSize, boxSize);
-    ctx.strokeStyle = '#0F766E';
-    ctx.lineWidth = 6;
-    ctx.strokeRect(boxX, boxY, boxSize, boxSize);
+    let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="100%" height="100%">\n`;
+    
+    // 1. Fond général
+    svg += `  <rect width="${size}" height="${size}" fill="#FAF8F5" />\n`;
+
+    // 2. Cadre principal de certification (Le Carré)
+    svg += `  <rect x="${boxX}" y="${boxY}" width="${boxSize}" height="${boxSize}" fill="#FFFFFF" stroke="#0F766E" stroke-width="6" />\n`;
 
     // 3. Rendu des 4 coins géométriques ancrés STRICTEMENT aux 4 coins intérieurs du carré
-    const fSize = 50;
     const cornerCoordinates = [
-        { x: boxX, y: boxY },                               // Top-Left (H-G)
-        { x: boxX + boxSize - fSize, y: boxY },             // Top-Right (H-D)
-        { x: boxX + boxSize - fSize, y: boxY + boxSize - fSize }, // Bottom-Right (B-D)
-        { x: boxX, y: boxY + boxSize - fSize }              // Bottom-Left (B-G)
+        { x: boxX, y: boxY },                               // Top-Left
+        { x: boxX + boxSize - fSize, y: boxY },             // Top-Right
+        { x: boxX + boxSize - fSize, y: boxY + boxSize - fSize }, // Bottom-Right
+        { x: boxX, y: boxY + boxSize - fSize }              // Bottom-Left
     ];
 
     cornerCoordinates.forEach((pos, index) => {
         const shape = cornerPattern[index];
-        drawCornerShape(ctx, shape, pos.x, pos.y, fSize);
+        svg += `  ${getCornerSvgShape(shape, pos.x, pos.y, fSize)}\n`;
     });
 
-    // 4. Logo central / Filigrane et identité institutionnelle
-    ctx.fillStyle = '#0F766E';
-    ctx.font = 'bold 24px Arial, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('ANOR CERTIFIED', size / 2, boxY + 70);
+    // 4. Identité institutionnelle et textes
+    svg += `  <text x="${size / 2}" y="${boxY + 70}" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#0F766E" text-anchor="middle">ANOR CERTIFIED</text>\n`;
+    svg += `  <line x1="${boxX + 80}" y1="${boxY + 95}" x2="${boxX + boxSize - 80}" y2="${boxY + 95}" stroke="#0F766E" stroke-width="2" />\n`;
+    
+    svg += `  <text x="${size / 2}" y="${boxY + 145}" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#1E293B" text-anchor="middle">LOT : ${lotNumber}</text>\n`;
+    svg += `  <text x="${size / 2}" y="${boxY + 195}" font-family="Arial, sans-serif" font-size="32" font-weight="bold" fill="#0F766E" text-anchor="middle">SERIE : ${compactSeries}</text>\n`;
 
-    // Ligne de séparation
-    ctx.strokeStyle = '#0F766E';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(boxX + 80, boxY + 95);
-    ctx.lineTo(boxX + boxSize - 80, boxY + 95);
-    ctx.stroke();
+    // 5. Index arabes en bas de l'encart
+    svg += `  <text x="${size / 2}" y="${boxY + boxSize - 35}" font-family="Arial, sans-serif" font-size="16" fill="#64748B" text-anchor="middle">INDEX ARABES : #${arabicIndex}</text>\n`;
 
-    // Textes centraux (Lot & Série)
-    ctx.fillStyle = '#1E293B';
-    ctx.font = 'bold 22px Arial, sans-serif';
-    ctx.fillText(`LOT : ${lotNumber}`, size / 2, boxY + 145);
-
-    ctx.font = 'bold 32px Arial, sans-serif';
-    ctx.fillStyle = '#0F766E';
-    ctx.fillText(`SERIE : ${compactSeries}`, size / 2, boxY + 195);
-
-    // 5. Incrustation optionnelle du visuel produit ou logo au centre si disponible
-    if (productImgPath && fs.existsSync(productImgPath)) {
-        try {
-            const productImg = await loadImage(productImgPath);
-            const imgSize = 140;
-            ctx.drawImage(productImg, (size / 2) - (imgSize / 2), boxY + 220, imgSize, imgSize);
-        } catch (e) {
-            console.error("Erreur de chargement du visuel produit :", e);
-        }
-    }
-
-    // 6. Index arabes en bas de l'encart
-    ctx.font = '16px Arial, sans-serif';
-    ctx.fillStyle = '#64748B';
-    ctx.textAlign = 'center';
-    ctx.fillText(`INDEX ARABES : #${arabicIndex}`, size / 2, boxY + boxSize - 35);
-
-    // Retourne le buffer PNG
-    return canvas.toBuffer('image/png');
+    svg += `</svg>`;
+    return svg;
 }
 
 /**
- * Fonction principale de création de lot complet pour l'industriel (Export PNG + Manifeste CSV)
+ * Fonction principale de création de lot complet pour l'industriel
  */
-async function processIndustrialBatch(lotNumber, totalQuantity, productImgPath = null) {
-    console.log(`[GÉNÉRATION PNG] Traitement du lot ${lotNumber} pour ${totalQuantity} produits...`);
+function processIndustrialBatch(lotNumber, totalQuantity) {
+    console.log(`[GÉNÉRATION] Traitement du lot ${lotNumber} pour ${totalQuantity} produits...`);
     
     const lotCornerPattern = generateRandomCornerPattern();
     console.log(`[SÉCURITÉ] Motif des 4 coins vides assigné au lot :`, lotCornerPattern);
@@ -174,15 +106,13 @@ async function processIndustrialBatch(lotNumber, totalQuantity, productImgPath =
 
     for (let i = 1; i <= totalQuantity; i++) {
         const compactSeries = toCompactRomanSeries(i);
+        const unitSvg = generateUnitSealSvg(lotNumber, i, compactSeries, lotCornerPattern);
         
-        // Génération du sceau unitaire au format PNG souverain
-        const unitPngBuffer = await generateUnitSealPng(lotNumber, i, compactSeries, lotCornerPattern, productImgPath);
-        
-        // Sauvegarde physique de l'image PNG unitaire si le volume est raisonnable
         if (totalQuantity <= 5000) {
-            fs.writeFileSync(path.join(batchDir, `seal_${i}_${compactSeries}.png`), unitPngBuffer);
+            fs.writeFileSync(path.join(batchDir, `seal_${i}_${compactSeries}.svg`), unitSvg, 'utf-8');
         }
 
+        batchManifest.path = batchManifest.push ? null : null; // structure
         batchManifest.push({
             arabic_index: i,
             compact_series: compactSeries,
@@ -190,14 +120,13 @@ async function processIndustrialBatch(lotNumber, totalQuantity, productImgPath =
         });
     }
 
-    // Génération du manifeste CSV global
     let csvContent = 'arabic_index,compact_series,lot_number\n';
     batchManifest.forEach(item => {
         csvContent += `${item.arabic_index},${item.compact_series},${lotNumber}\n`;
     });
     fs.writeFileSync(path.join(batchDir, `manifest_${lotNumber}.csv`), csvContent, 'utf-8');
 
-    console.log(`[SUCCÈS] Kit PNG souverain du lot ${lotNumber} généré dans : ${batchDir}`);
+    console.log(`[SUCCÈS] Kit du lot ${lotNumber} généré avec succès dans : ${batchDir}`);
     return {
         lotNumber,
         totalQuantity,
@@ -206,4 +135,4 @@ async function processIndustrialBatch(lotNumber, totalQuantity, productImgPath =
     };
 }
 
-module.exports = { processIndustrialBatch, generateUnitSealPng };
+module.exports = { processIndustrialBatch, generateUnitSealSvg };
