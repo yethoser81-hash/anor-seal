@@ -10,7 +10,7 @@ const path = require('path');
 require('dotenv').config();
 
 const sealConfig = require('./config/sealConfig');
-const { processIndustrialBatch } = require('./generators/generateBatchSeals');
+const { processIndustrialBatch, generateUnitSealSvg } = require('./generators/generateBatchSeals');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -51,22 +51,24 @@ app.post('/api/seals/generate-batch-seal', upload.fields([
 
         console.log(`[FORGE DU LOT] Traitement pour le lot : ${lot} (Quantité : ${quantite})`);
 
-        // Exécution du générateur industriel complet
+        // 1. Exécution du générateur industriel complet (manifeste + motifs)
         const batchResult = processIndustrialBatch(lot, parseInt(quantite, 10));
 
-        // Calcul de l'empreinte Hash SHA-256 unique
+        // 2. Génération du VRAI sceau SVG unitaire avec les motifs de coins du lot
+        const sampleSvg = generateUnitSealSvg(lot, 1, "I", batchResult.cornerPattern);
+        const imageUrl = `data:image/svg+xml;base64,${Buffer.from(sampleSvg).toString('base64')}`;
+
+        // 3. Calcul de l'empreinte Hash SHA-256 unique
         const rawStringData = `${nom_produit || 'Produit'}-${lot}-${quantite}-${pays_origine || 'Cameroun'}-${Date.now()}`;
         const sha256_hash = crypto.createHash('sha256').update(rawStringData).digest('hex');
 
-        // URL factice ou lien vers le kit généré
-        const dummyBase64Png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
         const zipUrl = `/output/batches/${lot}/manifest_${lot}.csv`;
 
         return res.status(200).json({
             success: true,
             lot: batchResult.lotNumber,
             sha256_hash: sha256_hash,
-            imageUrl: dummyBase64Png,
+            imageUrl: imageUrl, // <-- Le vrai sceau vectoriel de l'ANOR
             zipUrl: zipUrl,
             cornerPattern: batchResult.cornerPattern,
             message: "Sceau de lot forgé et enregistré avec succès."
