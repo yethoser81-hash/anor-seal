@@ -361,7 +361,9 @@ document.addEventListener("DOMContentLoaded", async () => {
                 }
 
                 if (!response.ok || !resultData.success) {
-                    throw new Error(resultData.error || resultData.message || "Erreur lors de la génération du sceau.");
+                    const rawError = resultData.error || resultData.message || "Erreur lors de la génération du sceau.";
+                    const errorMsg = typeof rawError === 'object' ? JSON.stringify(rawError) : rawError;
+                    throw new Error(errorMsg);
                 }
 
                 ajouterJournal("Réception du sceau et du kit de certification...");
