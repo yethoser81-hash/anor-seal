@@ -5,36 +5,30 @@ const config = require('../config/sealConfig');
 const { toCompactRomanSeries } = require('./variableStream');
 
 /**
- * Sélectionne de manière aléatoire ou séquentielle 4 coins vides parmi l'alphabet autorisé
+ * Dessine un glyphe géométrique spécifique (carré, cercle, losange, croix, barre)
  */
-function generateRandomCornerPattern() {
-    const shapes = config.cornerShapes || ['EMPTY_SQUARE', 'EMPTY_CIRCLE', 'EMPTY_DIAMOND', 'EMPTY_TRIANGLE'];
-    return [
-        shapes[Math.floor(Math.random() * shapes.length)],
-        shapes[Math.floor(Math.random() * shapes.length)],
-        shapes[Math.floor(Math.random() * shapes.length)],
-        shapes[Math.floor(Math.random() * shapes.length)]
-    ];
-}
-
-/**
- * Dessine la forme géométrique du coin ancré sur le Canvas PNG
- */
-function drawCornerShape(ctx, shape, x, y, size) {
-    const half = size / 2;
+function drawGlyph(ctx, type, x, y, size) {
     ctx.save();
     ctx.strokeStyle = '#0F766E';
-    ctx.fillStyle = '#FFFFFF';
-    ctx.lineWidth = 5;
+    ctx.fillStyle = '#0F766E';
+    ctx.lineWidth = 3;
+    const half = size / 2;
 
-    switch (shape) {
+    switch (type) {
+        case 'CIRCLE':
+            ctx.beginPath();
+            ctx.arc(x + half, y + half, half * 0.7, 0, Math.PI * 2);
+            ctx.fill();
+            break;
         case 'EMPTY_CIRCLE':
             ctx.beginPath();
-            ctx.arc(x + half, y + half, half, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.arc(x + half, y + half, half * 0.7, 0, Math.PI * 2);
             ctx.stroke();
             break;
-        case 'EMPTY_DIAMOND':
+        case 'SQUARE':
+            ctx.fillRect(x + size * 0.2, y + size * 0.2, size * 0.6, size * 0.6);
+            break;
+        case 'DIAMOND':
             ctx.beginPath();
             ctx.moveTo(x + half, y);
             ctx.lineTo(x + size, y + half);
@@ -42,112 +36,106 @@ function drawCornerShape(ctx, shape, x, y, size) {
             ctx.lineTo(x, y + half);
             ctx.closePath();
             ctx.fill();
-            ctx.stroke();
             break;
-        case 'EMPTY_H_RECTANGLE':
-            ctx.fillRect(x, y + size * 0.25, size, size * 0.5);
-            ctx.strokeRect(x, y + size * 0.25, size, size * 0.5);
-            break;
-        case 'EMPTY_V_RECTANGLE':
-            ctx.fillRect(x + size * 0.25, y, size * 0.5, size);
-            ctx.strokeRect(x + size * 0.25, y, size * 0.5, size);
-            break;
-        case 'EMPTY_TRIANGLE':
+        case 'CROSS':
             ctx.beginPath();
-            ctx.moveTo(x + half, y);
-            ctx.lineTo(x + size, y + size);
-            ctx.lineTo(x, y + size);
-            ctx.closePath();
-            ctx.fill();
+            ctx.moveTo(x + half, y + 2);
+            ctx.lineTo(x + half, y + size - 2);
+            ctx.moveTo(x + 2, y + half);
+            ctx.lineTo(x + size - 2, y + half);
             ctx.stroke();
             break;
-        case 'EMPTY_SQUARE':
+        case 'BAR':
         default:
-            ctx.fillRect(x, y, size, size);
-            ctx.strokeRect(x, y, size, size);
+            ctx.fillRect(x + size * 0.35, y + size * 0.1, size * 0.3, size * 0.8);
             break;
     }
     ctx.restore();
 }
 
 /**
- * Génère le Sceau unitaire en PNG Haute Définition (Le spécimen pour le lot)
+ * Génère le Sceau unitaire carré avec trame de glyphes intérieurs et zone de lot en bas
  */
 async function generateUnitSealPng(lotNumber, arabicIndex, compactSeries, cornerPattern) {
     const size = 800;
     const canvas = createCanvas(size, size);
     const ctx = canvas.getContext('2d');
 
-    const margin = 100;
-    const boxX = margin;
-    const boxY = margin;
-    const boxSize = size - (2 * margin);
-    const dataSize = 50;
-
-    const safeCornerPattern = Array.isArray(cornerPattern) ? cornerPattern : generateRandomCornerPattern();
-
-    // 1. Fond général
+    // 1. Fond général du sceau
     ctx.fillStyle = '#FAF8F5';
     ctx.fillRect(0, 0, size, size);
 
-    // 2. Cadre principal de certification (Le Carré)
+    const margin = 60;
+    const boxX = margin;
+    const boxY = margin;
+    const boxSize = size - (2 * margin);
+
+    // 2. Cadre carré extérieur principal
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(boxX, boxY, boxSize, boxSize);
     ctx.strokeStyle = '#0F766E';
     ctx.lineWidth = 6;
     ctx.strokeRect(boxX, boxY, boxSize, boxSize);
 
-    // 3. Rendu des 4 coins géométriques ancrés
-    const cornerCoordinates = [
-        { x: boxX, y: boxY },                                   // Top-Left
-        { x: boxX + boxSize - dataSize, y: boxY },               // Top-Right
-        { x: boxX + boxSize - dataSize, y: boxY + boxSize - dataSize }, // Bottom-Right
-        { x: boxX, y: boxY + boxSize - dataSize }                 // Bottom-Left
-    ];
+    // 3. Trame de glyphes intérieurs (répartition style motif technique)
+    const glyphTypes = ['CIRCLE', 'SQUARE', 'DIAMOND', 'CROSS', 'BAR', 'EMPTY_CIRCLE'];
+    const gridSize = 40;
+    const startX = boxX + 30;
+    const startY = boxY + 30;
+    const endX = boxX + boxSize - 50;
+    const endY = boxY + boxSize - 220; // Laisse de l'espace en bas pour le bloc Lot
 
-    cornerCoordinates.forEach((pos, index) => {
-        const shape = safeCornerPattern[index] || 'EMPTY_SQUARE';
-        drawCornerShape(ctx, shape, pos.x, pos.y, dataSize);
-    });
+    // Remplissage subtil en arrière-plan de glyphes
+    let seed = 123;
+    function pseudoRandom() {
+        seed = (seed * 9301 + 49297) % 233280;
+        return seed / 233280;
+    }
 
-    // 4. Identité institutionnelle et textes du haut
-    ctx.textAlign = 'center';
-    ctx.font = 'bold 24px Arial, sans-serif';
-    ctx.fillStyle = '#0F766E';
-    ctx.fillText('ANOR CERTIFIED', size / 2, boxY + 70);
+    for (let gx = startX; gx < endX; gx += gridSize) {
+        for (let gy = startY; gy < endY; gy += gridSize) {
+            // On ne met pas de glyphes en plein milieu pour préserver la lisibilité du logo et du texte
+            const distToCenterCenter = Math.hypot(gx - (size/2), gy - (boxY + 160));
+            if (distToCenterCenter > 130) {
+                if (pseudoRandom() > 0.4) {
+                    const randomGlyph = glyphTypes[Math.floor(pseudoRandom() * glyphTypes.length)];
+                    drawGlyph(ctx, randomGlyph, gx, gy, 24);
+                }
+            }
+        }
+    }
 
-    ctx.strokeStyle = '#0F766E';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(boxX + 80, boxY + 95);
-    ctx.lineTo(boxX + boxSize - 80, boxY + 95);
-    ctx.stroke();
-
-    // 5. Insertion du logo central
+    // 4. Insertion du logo ANOR central
     const logoPath = path.join(__dirname, '../assets/logo_anor_master.png');
     if (fs.existsSync(logoPath)) {
         try {
             const logoImage = await loadImage(logoPath);
-            const logoSize = 120;
-            ctx.drawImage(logoImage, (size - logoSize) / 2, boxY + 130, logoSize, logoSize);
+            const logoSize = 110;
+            ctx.drawImage(logoImage, (size - logoSize) / 2, boxY + 50, logoSize, logoSize);
         } catch (e) {
-            console.error("Erreur lors du chargement du logo central PNG :", e);
+            console.error("Erreur chargement logo :", e);
         }
     }
 
-    // 6. Textes de lot et série au centre/bas
-    ctx.font = 'bold 22px Arial, sans-serif';
-    ctx.fillStyle = '#1E293B';
-    ctx.fillText(`LOT : ${lotNumber}`, size / 2, boxY + 295);
+    // 5. Zone inférieure dédiée au Lot et à la Série (Conforme à ton attente)
+    // Séparateur fin
+    ctx.strokeStyle = '#0F766E';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(boxX + 50, boxY + 410);
+    ctx.lineTo(boxX + boxSize - 50, boxY + 410);
+    ctx.stroke();
 
-    ctx.font = 'bold 32px Arial, sans-serif';
+    // Texte LOT
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 36px Arial, sans-serif';
     ctx.fillStyle = '#0F766E';
-    ctx.fillText(`SERIE : ${compactSeries}`, size / 2, boxY + 345);
+    ctx.fillText(`LOT ${lotNumber}`, size / 2, boxY + 470);
 
-    // 7. Index arabes en bas de l'encart
-    ctx.font = '16px Arial, sans-serif';
-    ctx.fillStyle = '#64748B';
-    ctx.fillText(`INDEX ARABES : #${arabicIndex}`, size / 2, boxY + boxSize - 35);
+    // Texte Série / Code Datamatrix simulé en bas
+    ctx.font = 'bold 26px Arial, sans-serif';
+    ctx.fillStyle = '#1E293B';
+    ctx.fillText(`SERIE : ${compactSeries} / DM : #${arabicIndex}`, size / 2, boxY + 520);
 
     return canvas.toBuffer('image/png');
 }
@@ -156,19 +144,15 @@ async function generateUnitSealPng(lotNumber, arabicIndex, compactSeries, corner
  * Fonction principale de traitement du lot industriel
  */
 async function processIndustrialBatch(lotNumber, totalQuantity) {
-    console.log(`[GÉNÉRATION LOT] Traitement du lot ${lotNumber} pour une quantité déclarée de ${totalQuantity} pièces...`);
+    console.log(`[GÉNÉRATION LOT CARRÉ] Traitement du lot ${lotNumber} (${totalQuantity} pièces)...`);
     
-    const lotCornerPattern = generateRandomCornerPattern();
-    console.log(`[SÉCURITÉ] Motif des 4 coins vides assigné au lot :`, lotCornerPattern);
-
+    const lotCornerPattern = ['SQUARE', 'CIRCLE', 'DIAMOND', 'CROSS'];
     const batchDir = path.join(__dirname, `../output/batches/${lotNumber}`);
     fs.mkdirSync(batchDir, { recursive: true });
 
-    // Création du fichier manifeste reprenant les informations globales du lot et sa quantité
-    const csvContent = `lot_number,total_quantity,corner_pattern\n${lotNumber},${totalQuantity},"${JSON.stringify(lotCornerPattern)}"`;
+    const csvContent = `lot_number,total_quantity\n${lotNumber},${totalQuantity}`;
     fs.writeFileSync(path.join(batchDir, `manifest_${lotNumber}.csv`), csvContent, 'utf-8');
 
-    console.log(`[SUCCÈS] Lot ${lotNumber} enregistré avec ${totalQuantity} pièces.`);
     return {
         lotNumber,
         totalQuantity,
