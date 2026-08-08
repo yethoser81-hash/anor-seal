@@ -194,4 +194,8 @@ async function processIndustrialBatch(lotNumber, totalQuantity) {
     };
 }
 
-module.exports = { processIndustrialBatch, generateUnitSealPng };
+module.exports = { 
+    processIndustrialBatch, 
+    generateUnitSealPng, 
+    generateUnitSealSvg: generateUnitSealPng 
+};
