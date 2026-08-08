@@ -1,11 +1,6 @@
-/**
- * ANOR_SEAL - Générateur Complet de Lot Industriel (Backend - SVG Natif / Sans dépendance native)
- * Associe les 4 coins géométriques, les glyphes, le lot et les séries compactes,
- * puis génère les visuels robustes pour l'industriel.
- */
-
 const fs = require('fs');
 const path = require('path');
+const { createCanvas, loadImage } = require('canvas');
 const config = require('../config/sealConfig');
 const { toCompactRomanSeries } = require('./variableStream');
 
@@ -23,78 +18,143 @@ function generateRandomCornerPattern() {
 }
 
 /**
- * Génère le balisage SVG pour une forme de repère ancrée
+ * Dessine la forme géométrique du coin ancré sur le Canvas PNG
  */
-function getCornerSvgShape(shape, x, y, size) {
+function drawCornerShape(ctx, shape, x, y, size) {
     const half = size / 2;
+    ctx.save();
+    ctx.strokeStyle = '#0F766E';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.lineWidth = 5;
+
     switch (shape) {
         case 'EMPTY_CIRCLE':
-            return `<circle cx="${x + half}" cy="${y + half}" r="${half}" fill="#FFFFFF" stroke="#1E293B" stroke-width="5" />`;
+            ctx.beginPath();
+            ctx.arc(x + half, y + half, half, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            break;
         case 'EMPTY_DIAMOND':
-            return `<polygon points="${x + half},${y} ${x + size},${y + half} ${x + half},${y + size} ${x},${y + half}" fill="#FFFFFF" stroke="#1E293B" stroke-width="5" />`;
+            ctx.beginPath();
+            ctx.moveTo(x + half, y);
+            ctx.lineTo(x + size, y + half);
+            ctx.lineTo(x + half, y + size);
+            ctx.lineTo(x, y + half);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            break;
         case 'EMPTY_H_RECTANGLE':
-            return `<rect x="${x}" y="${y + size * 0.25}" width="${size}" height="${size * 0.5}" fill="#FFFFFF" stroke="#1E293B" stroke-width="5" />`;
+            ctx.fillRect(x, y + size * 0.25, size, size * 0.5);
+            ctx.strokeRect(x, y + size * 0.25, size, size * 0.5);
+            break;
         case 'EMPTY_V_RECTANGLE':
-            return `<rect x="${x + size * 0.25}" y="${y}" width="${size * 0.5}" height="${size}" fill="#FFFFFF" stroke="#1E293B" stroke-width="5" />`;
+            ctx.fillRect(x + size * 0.25, y, size * 0.5, size);
+            ctx.strokeRect(x + size * 0.25, y, size * 0.5, size);
+            break;
         case 'EMPTY_TRIANGLE':
-            return `<polygon points="${x + half},${y} ${x + size},${y + size} ${x},${y + size}" fill="#FFFFFF" stroke="#1E293B" stroke-width="5" />`;
+            ctx.beginPath();
+            ctx.moveTo(x + half, y);
+            ctx.lineTo(x + size, y + size);
+            ctx.lineTo(x, y + size);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            break;
         case 'EMPTY_SQUARE':
         default:
-            return `<rect x="${x}" y="${y}" width="${size}" height="${size}" fill="#FFFFFF" stroke="#1E293B" stroke-width="5" />`;
+            ctx.fillRect(x, y, size, size);
+            ctx.strokeRect(x, y, size, size);
+            break;
     }
+    ctx.restore();
 }
 
 /**
- * Génère le Sceau unitaire en SVG haute définition avec repères strictement ancrés dans le carré
+ * Génère le Sceau unitaire en PNG Haute Définition
  */
-function generateUnitSealSvg(lotNumber, arabicIndex, compactSeries, cornerPattern) {
+async function generateUnitSealPng(lotNumber, arabicIndex, compactSeries, cornerPattern) {
     const size = 800;
+    const canvas = createCanvas(size, size);
+    const ctx = canvas.getContext('2d');
+
     const margin = 100;
     const boxX = margin;
     const boxY = margin;
     const boxSize = size - (2 * margin);
-    const fSize = 50;
+    dataSize = 50; // fSize renommé
 
-    let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="100%" height="100%">\n`;
-    
     // 1. Fond général
-    svg += `  <rect width="${size}" height="${size}" fill="#FAF8F5" />\n`;
+    ctx.fillStyle = '#FAF8F5';
+    ctx.fillRect(0, 0, size, size);
 
     // 2. Cadre principal de certification (Le Carré)
-    svg += `  <rect x="${boxX}" y="${boxY}" width="${boxSize}" height="${boxSize}" fill="#FFFFFF" stroke="#0F766E" stroke-width="6" />\n`;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(boxX, boxY, boxSize, boxSize);
+    ctx.strokeStyle = '#0F766E';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(boxX, boxY, boxSize, boxSize);
 
     // 3. Rendu des 4 coins géométriques ancrés STRICTEMENT aux 4 coins intérieurs du carré
     const cornerCoordinates = [
-        { x: boxX, y: boxY },                               // Top-Left
-        { x: boxX + boxSize - fSize, y: boxY },             // Top-Right
-        { x: boxX + boxSize - fSize, y: boxY + boxSize - fSize }, // Bottom-Right
-        { x: boxX, y: boxY + boxSize - fSize }              // Bottom-Left
+        { x: boxX, y: boxY },                                     // Top-Left
+        { x: boxX + boxSize - dataSize, y: boxY },                // Top-Right
+        { x: boxX + boxSize - dataSize, y: boxY + boxSize - dataSize }, // Bottom-Right
+        { x: boxX, y: boxY + boxSize - dataSize }                 // Bottom-Left
     ];
 
     cornerCoordinates.forEach((pos, index) => {
         const shape = cornerPattern[index];
-        svg += `  ${getCornerSvgShape(shape, pos.x, pos.y, fSize)}\n`;
+        drawCornerShape(ctx, shape, pos.x, pos.y, dataSize);
     });
 
-    // 4. Identité institutionnelle et textes
-    svg += `  <text x="${size / 2}" y="${boxY + 70}" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#0F766E" text-anchor="middle">ANOR CERTIFIED</text>\n`;
-    svg += `  <line x1="${boxX + 80}" y1="${boxY + 95}" x2="${boxX + boxSize - 80}" y2="${boxY + 95}" stroke="#0F766E" stroke-width="2" />\n`;
-    
-    svg += `  <text x="${size / 2}" y="${boxY + 145}" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#1E293B" text-anchor="middle">LOT : ${lotNumber}</text>\n`;
-    svg += `  <text x="${size / 2}" y="${boxY + 195}" font-family="Arial, sans-serif" font-size="32" font-weight="bold" fill="#0F766E" text-anchor="middle">SERIE : ${compactSeries}</text>\n`;
+    // 4. Identité institutionnelle et textes du haut
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 24px Arial, sans-serif';
+    ctx.fillStyle = '#0F766E';
+    ctx.fillText('ANOR CERTIFIED', size / 2, boxY + 70);
 
-    // 5. Index arabes en bas de l'encart
-    svg += `  <text x="${size / 2}" y="${boxY + boxSize - 35}" font-family="Arial, sans-serif" font-size="16" fill="#64748B" text-anchor="middle">INDEX ARABES : #${arabicIndex}</text>\n`;
+    ctx.strokeStyle = '#0F766E';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(boxX + 80, boxY + 95);
+    ctx.lineTo(boxX + boxSize - 80, boxY + 95);
+    ctx.stroke();
 
-    svg += `</svg>`;
-    return svg;
+    // 5. Insertion du logo central (assets/logo_anor_master.png)
+    const logoPath = path.join(__dirname, '../assets/logo_anor_master.png');
+    if (fs.existsSync(logoPath)) {
+        try {
+            const logoImage = await loadImage(logoPath);
+            const logoSize = 120;
+            ctx.drawImage(logoImage, (size - logoSize) / 2, boxY + 130, logoSize, logoSize);
+        } catch (e) {
+            console.error("Erreur lors du chargement du logo central PNG :", e);
+        }
+    }
+
+    // 6. Textes de lot et série au centre/bas
+    ctx.font = 'bold 22px Arial, sans-serif';
+    ctx.fillStyle = '#1E293B';
+    ctx.fillText(`LOT : ${lotNumber}`, size / 2, boxY + 295);
+
+    ctx.font = 'bold 32px Arial, sans-serif';
+    ctx.fillStyle = '#0F766E';
+    ctx.fillText(`SERIE : ${compactSeries}`, size / 2, boxY + 345);
+
+    // 7. Index arabes en bas de l'encart
+    ctx.font = '16px Arial, sans-serif';
+    ctx.fillStyle = '#64748B';
+    ctx.fillText(`INDEX ARABES : #${arabicIndex}`, size / 2, boxY + boxSize - 35);
+
+    return canvas.toBuffer('image/png');
 }
 
 /**
- * Fonction principale de création de lot complet pour l'industriel
+ * Fonction principale de création de lot complet pour l'industriel (Sortie PNG HD)
  */
-function processIndustrialBatch(lotNumber, totalQuantity) {
-    console.log(`[GÉNÉRATION] Traitement du lot ${lotNumber} pour ${totalQuantity} produits...`);
+async function processIndustrialBatch(lotNumber, totalQuantity) {
+    console.log(`[GÉNÉRATION PNG HD] Traitement du lot ${lotNumber} pour ${totalQuantity} produits...`);
     
     const lotCornerPattern = generateRandomCornerPattern();
     console.log(`[SÉCURITÉ] Motif des 4 coins vides assigné au lot :`, lotCornerPattern);
@@ -106,13 +166,12 @@ function processIndustrialBatch(lotNumber, totalQuantity) {
 
     for (let i = 1; i <= totalQuantity; i++) {
         const compactSeries = toCompactRomanSeries(i);
-        const unitSvg = generateUnitSealSvg(lotNumber, i, compactSeries, lotCornerPattern);
+        const unitPngBuffer = await generateUnitSealPng(lotNumber, i, compactSeries, lotCornerPattern);
         
         if (totalQuantity <= 5000) {
-            fs.writeFileSync(path.join(batchDir, `seal_${i}_${compactSeries}.svg`), unitSvg, 'utf-8');
+            fs.writeFileSync(path.join(batchDir, `seal_${i}_${compactSeries}.png`), unitPngBuffer);
         }
 
-        batchManifest.path = batchManifest.push ? null : null; // structure
         batchManifest.push({
             arabic_index: i,
             compact_series: compactSeries,
@@ -126,7 +185,7 @@ function processIndustrialBatch(lotNumber, totalQuantity) {
     });
     fs.writeFileSync(path.join(batchDir, `manifest_${lotNumber}.csv`), csvContent, 'utf-8');
 
-    console.log(`[SUCCÈS] Kit du lot ${lotNumber} généré avec succès dans : ${batchDir}`);
+    console.log(`[SUCCÈS] Kit PNG HD du lot ${lotNumber} généré avec succès dans : ${batchDir}`);
     return {
         lotNumber,
         totalQuantity,
@@ -135,4 +194,4 @@ function processIndustrialBatch(lotNumber, totalQuantity) {
     };
 }
 
-module.exports = { processIndustrialBatch, generateUnitSealSvg };
+module.exports = { processIndustrialBatch, generateUnitSealPng };
