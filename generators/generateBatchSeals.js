@@ -71,7 +71,7 @@ function drawCornerShape(ctx, shape, x, y, size) {
 }
 
 /**
- * Génère le Sceau unitaire en PNG Haute Définition
+ * Génère le Sceau unitaire en PNG Haute Définition (Le spécimen pour le lot)
  */
 async function generateUnitSealPng(lotNumber, arabicIndex, compactSeries, cornerPattern) {
     const size = 800;
@@ -82,9 +82,8 @@ async function generateUnitSealPng(lotNumber, arabicIndex, compactSeries, corner
     const boxX = margin;
     const boxY = margin;
     const boxSize = size - (2 * margin);
-    const dataSize = 50; // Correction : ajout de 'const'
+    const dataSize = 50;
 
-    // Sécurité au cas où cornerPattern serait undefined
     const safeCornerPattern = Array.isArray(cornerPattern) ? cornerPattern : generateRandomCornerPattern();
 
     // 1. Fond général
@@ -98,12 +97,12 @@ async function generateUnitSealPng(lotNumber, arabicIndex, compactSeries, corner
     ctx.lineWidth = 6;
     ctx.strokeRect(boxX, boxY, boxSize, boxSize);
 
-    // 3. Rendu des 4 coins géométriques ancrés STRICTEMENT aux 4 coins intérieurs du carré
+    // 3. Rendu des 4 coins géométriques ancrés
     const cornerCoordinates = [
-        { x: boxX, y: boxY },                                            // Top-Left
-        { x: boxX + boxSize - dataSize, y: boxY },                       // Top-Right
+        { x: boxX, y: boxY },                                   // Top-Left
+        { x: boxX + boxSize - dataSize, y: boxY },               // Top-Right
         { x: boxX + boxSize - dataSize, y: boxY + boxSize - dataSize }, // Bottom-Right
-        { x: boxX, y: boxY + boxSize - dataSize }                         // Bottom-Left
+        { x: boxX, y: boxY + boxSize - dataSize }                 // Bottom-Left
     ];
 
     cornerCoordinates.forEach((pos, index) => {
@@ -124,7 +123,7 @@ async function generateUnitSealPng(lotNumber, arabicIndex, compactSeries, corner
     ctx.lineTo(boxX + boxSize - 80, boxY + 95);
     ctx.stroke();
 
-    // 5. Insertion du logo central (assets/logo_anor_master.png)
+    // 5. Insertion du logo central
     const logoPath = path.join(__dirname, '../assets/logo_anor_master.png');
     if (fs.existsSync(logoPath)) {
         try {
@@ -154,10 +153,10 @@ async function generateUnitSealPng(lotNumber, arabicIndex, compactSeries, corner
 }
 
 /**
- * Fonction principale de création de lot complet pour l'industriel (Sortie PNG HD)
+ * Fonction principale de traitement du lot industriel
  */
 async function processIndustrialBatch(lotNumber, totalQuantity) {
-    console.log(`[GÉNÉRATION PNG HD] Traitement du lot ${lotNumber} pour ${totalQuantity} produits...`);
+    console.log(`[GÉNÉRATION LOT] Traitement du lot ${lotNumber} pour une quantité déclarée de ${totalQuantity} pièces...`);
     
     const lotCornerPattern = generateRandomCornerPattern();
     console.log(`[SÉCURITÉ] Motif des 4 coins vides assigné au lot :`, lotCornerPattern);
@@ -165,30 +164,11 @@ async function processIndustrialBatch(lotNumber, totalQuantity) {
     const batchDir = path.join(__dirname, `../output/batches/${lotNumber}`);
     fs.mkdirSync(batchDir, { recursive: true });
 
-    let batchManifest = [];
-
-    for (let i = 1; i <= totalQuantity; i++) {
-        const compactSeries = toCompactRomanSeries(i);
-        const unitPngBuffer = await generateUnitSealPng(lotNumber, i, compactSeries, lotCornerPattern);
-        
-        if (totalQuantity <= 5000) {
-            fs.writeFileSync(path.join(batchDir, `seal_${i}_${compactSeries}.png`), unitPngBuffer);
-        }
-
-        batchManifest.push({
-            arabic_index: i,
-            compact_series: compactSeries,
-            corner_pattern: lotCornerPattern
-        });
-    }
-
-    let csvContent = 'arabic_index,compact_series,lot_number\n';
-    batchManifest.forEach(item => {
-        csvContent += `${item.arabic_index},${item.compact_series},${lotNumber}\n`;
-    });
+    // Création du fichier manifeste reprenant les informations globales du lot et sa quantité
+    const csvContent = `lot_number,total_quantity,corner_pattern\n${lotNumber},${totalQuantity},"${JSON.stringify(lotCornerPattern)}"`;
     fs.writeFileSync(path.join(batchDir, `manifest_${lotNumber}.csv`), csvContent, 'utf-8');
 
-    console.log(`[SUCCÈS] Kit PNG HD du lot ${lotNumber} généré avec succès dans : ${batchDir}`);
+    console.log(`[SUCCÈS] Lot ${lotNumber} enregistré avec ${totalQuantity} pièces.`);
     return {
         lotNumber,
         totalQuantity,
