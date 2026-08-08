@@ -10,12 +10,7 @@ const path = require('path');
 require('dotenv').config();
 
 const sealConfig = require('./config/sealConfig');
-let generateBatchSeals = require('./generators/generateBatchSeals');
-
-// Sécurité pour s'assurer qu'on appelle bien une fonction même si exporté sous forme d'objet
-if (typeof generateBatchSeals !== 'function' && generateBatchSeals.generateBatchSeals) {
-    generateBatchSeals = generateBatchSeals.generateBatchSeals;
-}
+const { processIndustrialBatch } = require('./generators/generateBatchSeals');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -26,6 +21,8 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
+// Pour exposer les fichiers générés (comme les manifestes ou les SVG unitaires)
+app.use('/output', express.static(path.join(__dirname, 'output')));
 
 app.get('/api/health', (req, res) => {
     res.json({ status: 'online', system: 'ANOR_SEAL Backend Active' });
@@ -35,6 +32,9 @@ app.get('/health', (req, res) => {
     res.status(200).json({ status: 'online', timestamp: new Date() });
 });
 
+/**
+ * Route de génération et de forge d'un sceau de lot
+ */
 app.post('/api/seals/generate-batch-seal', upload.fields([
     { name: 'certificat_pdf', maxCount: 1 },
     { name: 'visuel_produit', maxCount: 1 }
@@ -49,37 +49,34 @@ app.post('/api/seals/generate-batch-seal', upload.fields([
             });
         }
 
-        let result = {};
+        console.log(`[FORGE DU LOT] Traitement pour le lot : ${lot} (Quantité : ${quantite})`);
+
+        // Exécution du générateur industriel complet
+        const batchResult = processIndustrialBatch(lot, parseInt(quantite, 10));
+
+        // Calcul de l'empreinte Hash SHA-256 unique
         const rawStringData = `${nom_produit || 'Produit'}-${lot}-${quantite}-${pays_origine || 'Cameroun'}-${Date.now()}`;
         const sha256_hash = crypto.createHash('sha256').update(rawStringData).digest('hex');
-        const dummyBase64Png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 
-        if (typeof generateBatchSeals === 'function') {
-            try {
-                result = await generateBatchSeals({
-                    data: req.body,
-                    files: req.files,
-                    config: sealConfig
-                });
-            } catch (err) {
-                console.warn("Avertissement exécution module, utilisation du mode de secours :", err.message);
-            }
-        }
+        // URL factice ou lien vers le kit généré
+        const dummyBase64Png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+        const zipUrl = `/output/batches/${lot}/manifest_${lot}.csv`;
 
         return res.status(200).json({
             success: true,
-            lot: lot,
-            sha256_hash: result.sha256_hash || sha256_hash,
-            imageUrl: result.imageUrl || dummyBase64Png,
-            zipUrl: result.zipUrl || `/downloads/ANOR_Kit_${lot}.zip`,
-            message: "Sceau de lot forgé avec succès."
+            lot: batchResult.lotNumber,
+            sha256_hash: sha256_hash,
+            imageUrl: dummyBase64Png,
+            zipUrl: zipUrl,
+            cornerPattern: batchResult.cornerPattern,
+            message: "Sceau de lot forgé et enregistré avec succès."
         });
 
     } catch (error) {
         console.error('Erreur lors de la forge du sceau:', error);
         return res.status(500).json({ 
             success: false, 
-            error: { message: error.message || 'Erreur interne du serveur.' }
+            error: { message: error.message || 'Erreur interne du serveur lors de la forge.' }
         });
     }
 });
