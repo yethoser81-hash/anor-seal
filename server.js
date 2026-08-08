@@ -11,7 +11,7 @@ require('dotenv').config();
 
 // Importation de la configuration et du module de génération de lots
 const sealConfig = require('./config/sealConfig');
-const generateBatchSeals = require('./generator/generateBatchSeals');
+const generateBatchSeals = require('./generators/generateBatchSeals');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
