@@ -377,7 +377,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
                 document.getElementById("identifiant").textContent = resultData.lot;
                 document.getElementById("sha256").textContent = resultData.sha256_hash ? resultData.sha256_hash.substring(0, 16) + "..." : "Synchronisé Supabase";
-                document.getElementById("debug").textContent = "IA Validée (100%)";
+                
+                // SECURISATION : Protection contre les propriétés non définies (évite le plantage)
+                const corners = resultData.cornerPattern || [0, 0, 0, 0];
+                document.getElementById("debug").textContent = `IA Validée (100%) - Coins: [${corners[0] || 0}]`;
 
                 document.getElementById("progressFill").style.width = "100%";
                 document.getElementById("progressLabel").textContent = "100%";
