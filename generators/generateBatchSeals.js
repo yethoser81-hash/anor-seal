@@ -8,7 +8,7 @@ const { toCompactRomanSeries } = require('./variableStream');
  * Sélectionne de manière aléatoire ou séquentielle 4 coins vides parmi l'alphabet autorisé
  */
 function generateRandomCornerPattern() {
-    const shapes = config.cornerShapes;
+    const shapes = config.cornerShapes || ['EMPTY_SQUARE', 'EMPTY_CIRCLE', 'EMPTY_DIAMOND', 'EMPTY_TRIANGLE'];
     return [
         shapes[Math.floor(Math.random() * shapes.length)],
         shapes[Math.floor(Math.random() * shapes.length)],
@@ -82,7 +82,10 @@ async function generateUnitSealPng(lotNumber, arabicIndex, compactSeries, corner
     const boxX = margin;
     const boxY = margin;
     const boxSize = size - (2 * margin);
-    dataSize = 50; // fSize renommé
+    const dataSize = 50; // Correction : ajout de 'const'
+
+    // Sécurité au cas où cornerPattern serait undefined
+    const safeCornerPattern = Array.isArray(cornerPattern) ? cornerPattern : generateRandomCornerPattern();
 
     // 1. Fond général
     ctx.fillStyle = '#FAF8F5';
@@ -97,14 +100,14 @@ async function generateUnitSealPng(lotNumber, arabicIndex, compactSeries, corner
 
     // 3. Rendu des 4 coins géométriques ancrés STRICTEMENT aux 4 coins intérieurs du carré
     const cornerCoordinates = [
-        { x: boxX, y: boxY },                                     // Top-Left
-        { x: boxX + boxSize - dataSize, y: boxY },                // Top-Right
+        { x: boxX, y: boxY },                                            // Top-Left
+        { x: boxX + boxSize - dataSize, y: boxY },                       // Top-Right
         { x: boxX + boxSize - dataSize, y: boxY + boxSize - dataSize }, // Bottom-Right
-        { x: boxX, y: boxY + boxSize - dataSize }                 // Bottom-Left
+        { x: boxX, y: boxY + boxSize - dataSize }                         // Bottom-Left
     ];
 
     cornerCoordinates.forEach((pos, index) => {
-        const shape = cornerPattern[index];
+        const shape = safeCornerPattern[index] || 'EMPTY_SQUARE';
         drawCornerShape(ctx, shape, pos.x, pos.y, dataSize);
     });
 
