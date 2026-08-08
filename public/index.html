@@ -352,10 +352,16 @@ document.addEventListener("DOMContentLoaded", async () => {
                     body: formData
                 });
 
-                const resultData = await response.json();
+                const responseText = await response.text();
+                let resultData;
+                try {
+                    resultData = JSON.parse(responseText);
+                } catch (parseError) {
+                    throw new Error(`Erreur serveur (${response.status}) - Réponse brute : ${responseText || 'Vide'}`);
+                }
 
                 if (!response.ok || !resultData.success) {
-                    throw new Error(resultData.error?.message || resultData.message || "Erreur lors de la génération du sceau.");
+                    throw new Error(resultData.error || resultData.message || "Erreur lors de la génération du sceau.");
                 }
 
                 ajouterJournal("Réception du sceau et du kit de certification...");
@@ -378,7 +384,6 @@ document.addEventListener("DOMContentLoaded", async () => {
                 document.getElementById("identifiant").textContent = resultData.lot;
                 document.getElementById("sha256").textContent = resultData.sha256_hash ? resultData.sha256_hash.substring(0, 16) + "..." : "Synchronisé Supabase";
                 
-                // SECURISATION : Protection contre les propriétés non définies (évite le plantage)
                 const corners = resultData.cornerPattern || [0, 0, 0, 0];
                 document.getElementById("debug").textContent = `IA Validée (100%) - Coins: [${corners[0] || 0}]`;
 
