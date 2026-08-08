@@ -52,7 +52,8 @@ app.post('/api/seals/generate-batch-seal', upload.fields([
 
         let batchResult;
         try {
-            batchResult = processIndustrialBatch(lot, parseInt(quantite, 10));
+            // CORRECTION CRUCIALE : Ajout de 'await' car processIndustrialBatch est async
+            batchResult = await processIndustrialBatch(lot, parseInt(quantite, 10));
         } catch (genError) {
             console.error("Erreur dans processIndustrialBatch:", genError);
             throw new Error(`Erreur du générateur de lot : ${genError.message}`);
@@ -62,7 +63,7 @@ app.post('/api/seals/generate-batch-seal', upload.fields([
             throw new Error("Le générateur n'a pas retourné de motif de coins valide (cornerPattern).");
         }
 
-        // 2. Génération du sceau PNG unitaire Haute Définition (avec await)
+        // 2. Génération du sceau PNG unitaire Haute Définition
         const samplePngBuffer = await generateUnitSealSvg(lot, 1, "I", batchResult.cornerPattern);
         
         // Conversion du buffer PNG en base64 pour le front-end
